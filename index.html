@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人简介</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft Yahei", sans-serif;
+        }
+        body {
+            background-color: #f5f7fa;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        /* 顶部导航栏 */
+        .nav {
+            background: #fff;
+            padding: 15px 25px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .nav a {
+            margin: 0 10px;
+            padding: 8px 16px;
+            background: #2563eb;
+            color: white;
+            border-radius: 6px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .nav a:hover {
+            background: #1d4ed8;
+        }
+
+        /* 个人简介卡片 */
+        .profile-card {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.08);
+        }
+        .profile-card h1 {
+            font-size: 28px;
+            margin-bottom: 15px;
+            color: #222;
+        }
+        .profile-card p {
+            font-size: 16px;
+            color: #555;
+            line-height: 1.7;
+            margin-bottom: 20px;
+        }
+        .tags span {
+            display: inline-block;
+            background: #e0ebff;
+            color: #2563eb;
+            padding: 6px 14px;
+            border-radius: 20px;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 顶部导航 -->
+        <div class="nav">
+            <a href="index.html">🏠 个人简介</a>
+            <a href="links.html">🔗 我的收藏</a>
+        </div>
+
+        <!-- 个人简介内容 -->
+        <div class="profile-card">
+            <h1>👋 你好，我是 XXX</h1>
+            <p>热爱编程、喜欢收集高效工具、持续学习的技术爱好者。</p>
+            <p>这个网站用来展示我的个人介绍和常用收藏网站。</p>
+
+            <div class="tags">
+                <span>编程学习者</span>
+                <span>前端爱好者</span>
+                <span>工具控</span>
+                <span>GitHub 用户</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
