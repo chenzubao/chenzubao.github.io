@@ -51,17 +51,18 @@
             cursor: not-allowed;
         }
 
-        /* 族谱布局 */
+        /* 正常族谱排版：一代一排，垂直向下 */
         .tree {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 20px;
+            gap: 0;
         }
-        .generation-row {
+        .generation {
             display: flex;
             justify-content: center;
-            gap: 60px;
+            gap: 50px;
+            margin: 15px 0;
             position: relative;
         }
         .person {
@@ -70,10 +71,8 @@
             border: 1px solid #ddd;
             border-radius: 6px;
             text-align: center;
-            min-width: 130px;
+            min-width: 140px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            position: relative;
-            white-space: nowrap;
         }
         .person.highlight {
             background: #fff2cc;
@@ -81,23 +80,12 @@
             transform: scale(1.08);
         }
 
-        /* 垂直连线：父 → 子 */
+        /* 父子连线 */
         .line-v {
             width: 1px;
-            height: 20px;
+            height: 25px;
             background: #666;
             margin: 0 auto;
-        }
-
-        /* 水平连线：多兄弟 */
-        .line-h {
-            height: 1px;
-            background: #666;
-            position: absolute;
-            top: -10px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: -1;
         }
     </style>
 </head>
@@ -125,7 +113,7 @@
                 const workbook = XLSX.read(data);
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                 const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-                buildRealFamilyTree(rows);
+                buildTree(rows);
                 document.getElementById("loading").style.display = "none";
             } catch (e) {
                 document.getElementById("loading").innerText = "读取Excel失败，请检查文件名";
@@ -133,54 +121,49 @@
             }
         }
 
-        // 🔥 真正的族谱：父→子关系严格对应Excel每行
-        function buildRealFamilyTree(rows) {
+        // 🔥 稳定不错乱：严格按Excel父子关系 + 一代一排
+        function buildTree(rows) {
             const container = document.getElementById("tree");
             container.innerHTML = "";
 
-            // 按世代分组（严格父子关系）
+            // 按世代整理（自动去重）
             const genMap = new Map();
-            const parentChildMap = new Map();
+            const parentChild = new Map();
 
             rows.forEach(row => {
-                let validCells = row.filter(n => n && n.toString().trim());
-                if (validCells.length < 1) return;
-
-                for (let i = 0; i < validCells.length; i++) {
+                const valid = row.filter(n => n && n.toString().trim());
+                for (let i = 0; i < valid.length; i++) {
+                    const name = valid[i].toString().trim();
                     const gen = i + 1;
-                    const name = validCells[i].toString().trim();
-                    if (!genMap.has(gen)) genMap.set(gen, []);
-                    if (!genMap.get(gen).includes(name)) genMap.get(gen).push(name);
+                    if (!genMap.has(gen)) genMap.set(gen, new Set());
+                    genMap.get(gen).add(name);
 
-                    // 绑定父子关系
+                    // 绑定父子
                     if (i > 0) {
-                        const parent = validCells[i - 1].toString().trim();
-                        if (!parentChildMap.has(parent)) parentChildMap.set(parent, []);
-                        if (!parentChildMap.get(parent).includes(name)) {
-                            parentChildMap.get(parent).push(name);
-                        }
+                        const p = valid[i - 1].toString().trim();
+                        if (!parentChild.has(p)) parentChild.set(p, new Set());
+                        parentChild.get(p).add(name);
                     }
                 }
             });
 
-            // 渲染每一代 + 父子连线
+            // 渲染：一代一排 + 垂直连线
             const gens = Array.from(genMap.keys()).sort((a, b) => a - b);
-            gens.forEach((genNum, idx) => {
-                const people = genMap.get(genNum);
+            gens.forEach((g, idx) => {
+                // 一代一排
+                const genDiv = document.createElement("div");
+                genDiv.className = "generation";
+                container.appendChild(genDiv);
 
-                const row = document.createElement("div");
-                row.className = "generation-row";
-                container.appendChild(row);
-
-                people.forEach(name => {
+                Array.from(genMap.get(g)).forEach(name => {
                     const node = document.createElement("div");
                     node.className = "person";
                     node.dataset.name = name;
-                    node.innerText = `${name} (第${genNum}代)`;
-                    row.appendChild(node);
+                    node.textContent = `${name}（第${g}代）`;
+                    genDiv.appendChild(node);
                 });
 
-                // 添加垂直连线
+                // 加垂直连线（除了最后一代）
                 if (idx < gens.length - 1) {
                     const line = document.createElement("div");
                     line.className = "line-v";
@@ -219,12 +202,10 @@
             matchNodes[index].classList.add('highlight');
             matchNodes[index].scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
-
         function prevMatch() {
             currentIndex = (currentIndex - 1 + matchNodes.length) % matchNodes.length;
             goToMatch(currentIndex);
         }
-
         function nextMatch() {
             currentIndex = (currentIndex + 1) % matchNodes.length;
             goToMatch(currentIndex);
