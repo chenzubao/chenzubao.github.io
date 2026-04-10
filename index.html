@@ -114,7 +114,7 @@
         // 读取Excel
         async function loadExcel() {
             try {
-                const res = await fetch("谌氏族谱.xlsx");
+                const res = await fetch("谌氏族谱.csv");
                 const blob = await res.blob();
                 const data = await blob.arrayBuffer();
                 const workbook = XLSX.read(data);
