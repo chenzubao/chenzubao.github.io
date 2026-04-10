@@ -22,7 +22,7 @@
             color: #333;
         }
         .search-box {
-            max-width: 500px;
+            max-width: 600px;
             margin: 0 auto 40px;
             display: flex;
             gap: 8px;
@@ -51,25 +51,27 @@
             cursor: not-allowed;
         }
 
-        /* 竖版垂直族谱样式 */
-        .tree {
+        /* 一代一排 横向布局 */
+        .generation {
             display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0;
-            margin-top: 20px;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 30px;
+            margin: 15px 0;
+            position: relative;
         }
+
+        /* 人物卡片 */
         .node {
-            padding: 12px 20px;
+            padding: 12px 18px;
             background: #fff;
             border: 1px solid #ddd;
             border-radius: 8px;
             text-align: center;
-            min-width: 160px;
+            min-width: 140px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             transition: all 0.3s;
             position: relative;
-            margin: 10px 0;
         }
         .node.highlight {
             background: #fff2cc;
@@ -78,19 +80,12 @@
             box-shadow: 0 0 12px rgba(255, 152, 0, 0.3);
         }
 
-        /* 竖线连接上下代 */
-        .node::after {
-            content: "";
+        /* 垂直连线：代与代之间 */
+        .line-vertical {
             width: 1px;
             height: 20px;
             background: #999;
-            position: absolute;
-            bottom: -20px;
-            left: 50%;
-            transform: translateX(-50%);
-        }
-        .node.last::after {
-            display: none;
+            margin: 0 auto;
         }
 
         #loading {
@@ -124,8 +119,8 @@
                 const data = await blob.arrayBuffer();
                 const workbook = XLSX.read(data);
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                const json = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-                buildVerticalTree(json);
+                const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                buildFamilyTree(rows);
                 document.getElementById("loading").style.display = "none";
             } catch (e) {
                 document.getElementById("loading").innerText = "读取Excel失败，请检查文件名";
@@ -133,8 +128,8 @@
             }
         }
 
-        // 🔥 核心：按Excel每一行，从上到下竖版展示（不改Excel）
-        function buildVerticalTree(rows) {
+        // 🔥 核心：一代一排，垂直向下排列
+        function buildFamilyTree(rows) {
             const treeContainer = document.getElementById("tree");
             treeContainer.innerHTML = "";
 
@@ -143,28 +138,41 @@
                 return;
             }
 
-            // 遍历每一行，生成垂直族谱
-            rows.forEach((row, rowIndex) => {
-                if (!row || row.every(item => !item)) return;
+            // 按列分组 = 按代分组
+            const maxGen = rows[0].length;
+            const generations = Array.from({ length: maxGen }, () => new Set());
 
-                const rowWrapper = document.createElement("div");
-                rowWrapper.style.marginBottom = "40px";
-                treeContainer.appendChild(rowWrapper);
-
-                const tree = document.createElement("div");
-                tree.className = "tree";
-                rowWrapper.appendChild(tree);
-
-                // 每一行的每一列 = 一代，从上往下排列
+            rows.forEach(row => {
                 row.forEach((name, colIndex) => {
-                    if (!name) return;
+                    if (name && name.toString().trim()) {
+                        generations[colIndex].add(name.toString().trim());
+                    }
+                });
+            });
 
+            // 渲染每一代（一排）
+            generations.forEach((genSet, index) => {
+                const genList = Array.from(genSet);
+                if (genList.length === 0) return;
+
+                // 垂直连线
+                if (index > 0) {
+                    const line = document.createElement("div");
+                    line.className = "line-vertical";
+                    treeContainer.appendChild(line);
+                }
+
+                // 一代一排
+                const genDiv = document.createElement("div");
+                genDiv.className = "generation";
+                treeContainer.appendChild(genDiv);
+
+                genList.forEach(name => {
                     const node = document.createElement("div");
-                    const isLast = colIndex === row.length - 1;
-                    node.className = `node ${isLast ? "last" : ""}`;
+                    node.className = "node";
                     node.dataset.name = name;
-                    node.innerHTML = `${name}<br><small>第${colIndex + 1}代</small>`;
-                    tree.appendChild(node);
+                    node.innerHTML = `${name}<br><small>第${index + 1}代</small>`;
+                    genDiv.appendChild(node);
                 });
             });
 
