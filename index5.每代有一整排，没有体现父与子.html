@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>谌氏族谱</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        body {
+            padding: 30px;
+            background: #f7f8fa;
+        }
+        .title {
+            text-align: center;
+            font-size: 26px;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .search-box {
+            max-width: 600px;
+            margin: 0 auto 40px;
+            display: flex;
+            gap: 8px;
+        }
+        #searchInput {
+            flex: 1;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 15px;
+            outline: none;
+        }
+        #searchInput:focus {
+            border-color: #1890ff;
+        }
+        .search-btn {
+            padding: 10px 16px;
+            background: #1890ff;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .search-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* 一代一排 横向布局 */
+        .generation {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 30px;
+            margin: 15px 0;
+            position: relative;
+        }
+
+        /* 人物卡片 */
+        .node {
+            padding: 12px 18px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            text-align: center;
+            min-width: 140px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+            position: relative;
+        }
+        .node.highlight {
+            background: #fff2cc;
+            border-color: #ff9800;
+            transform: scale(1.08);
+            box-shadow: 0 0 12px rgba(255, 152, 0, 0.3);
+        }
+
+        /* 垂直连线：代与代之间 */
+        .line-vertical {
+            width: 1px;
+            height: 20px;
+            background: #999;
+            margin: 0 auto;
+        }
+
+        #loading {
+            text-align: center;
+            font-size: 18px;
+            color: #666;
+            margin: 50px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="title">谌氏族谱</div>
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="输入名字搜索..." autocomplete="off">
+        <button class="search-btn" onclick="prevMatch()" disabled>上一个</button>
+        <button class="search-btn" onclick="nextMatch()" disabled>下一个</button>
+    </div>
+    <div id="loading">正在读取族谱数据...</div>
+    <div id="tree"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script>
+        let matchNodes = [];
+        let currentIndex = 0;
+
+        // 读取Excel
+        async function loadExcel() {
+            try {
+                const res = await fetch("谌氏族谱.xlsx");
+                const blob = await res.blob();
+                const data = await blob.arrayBuffer();
+                const workbook = XLSX.read(data);
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                buildFamilyTree(rows);
+                document.getElementById("loading").style.display = "none";
+            } catch (e) {
+                document.getElementById("loading").innerText = "读取Excel失败，请检查文件名";
+                console.error(e);
+            }
+        }
+
+        // 🔥 核心：一代一排，垂直向下排列
+        function buildFamilyTree(rows) {
+            const treeContainer = document.getElementById("tree");
+            treeContainer.innerHTML = "";
+
+            if (!rows || rows.length === 0) {
+                treeContainer.innerHTML = "暂无数据";
+                return;
+            }
+
+            // 按列分组 = 按代分组
+            const maxGen = rows[0].length;
+            const generations = Array.from({ length: maxGen }, () => new Set());
+
+            rows.forEach(row => {
+                row.forEach((name, colIndex) => {
+                    if (name && name.toString().trim()) {
+                        generations[colIndex].add(name.toString().trim());
+                    }
+                });
+            });
+
+            // 渲染每一代（一排）
+            generations.forEach((genSet, index) => {
+                const genList = Array.from(genSet);
+                if (genList.length === 0) return;
+
+                // 垂直连线
+                if (index > 0) {
+                    const line = document.createElement("div");
+                    line.className = "line-vertical";
+                    treeContainer.appendChild(line);
+                }
+
+                // 一代一排
+                const genDiv = document.createElement("div");
+                genDiv.className = "generation";
+                treeContainer.appendChild(genDiv);
+
+                genList.forEach(name => {
+                    const node = document.createElement("div");
+                    node.className = "node";
+                    node.dataset.name = name;
+                    node.innerHTML = `${name}<br><small>第${index + 1}代</small>`;
+                    genDiv.appendChild(node);
+                });
+            });
+
+            searchName();
+        }
+
+        // 搜索功能
+        const input = document.getElementById('searchInput');
+        input.addEventListener('input', searchName);
+        input.addEventListener('keyup', e => e.key === 'Enter' && nextMatch());
+
+        function searchName() {
+            const key = input.value.trim();
+            document.querySelectorAll('.node').forEach(n => n.classList.remove('highlight'));
+            matchNodes = [];
+            currentIndex = 0;
+            document.querySelectorAll('.search-btn').forEach(b => b.disabled = true);
+            if (!key) return;
+
+            document.querySelectorAll('.node').forEach(node => {
+                if (node.dataset.name.includes(key)) matchNodes.push(node);
+            });
+
+            if (matchNodes.length > 0) {
+                document.querySelectorAll('.search-btn').forEach(b => b.disabled = false);
+                goToMatch(0);
+            }
+        }
+
+        function goToMatch(index) {
+            document.querySelectorAll('.node').forEach(n => n.classList.remove('highlight'));
+            matchNodes[index].classList.add('highlight');
+            matchNodes[index].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function prevMatch() {
+            currentIndex = (currentIndex - 1 + matchNodes.length) % matchNodes.length;
+            goToMatch(currentIndex);
+        }
+
+        function nextMatch() {
+            currentIndex = (currentIndex + 1) % matchNodes.length;
+            goToMatch(currentIndex);
+        }
+
+        window.onload = loadExcel;
+    </script>
+</body>
+</html>
