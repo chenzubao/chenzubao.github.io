@@ -3,95 +3,229 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>个人简介</title>
+    <title>谌氏族谱</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: "Microsoft Yahei", sans-serif;
+            font-family: "Microsoft YaHei", sans-serif;
         }
         body {
-            background-color: #f5f7fa;
-            padding: 20px;
+            padding: 30px;
+            background: #f7f8fa;
         }
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-        }
-
-        /* 顶部导航栏 */
-        .nav {
-            background: #fff;
-            padding: 15px 25px;
-            border-radius: 10px;
-            margin-bottom: 30px;
+        .title {
             text-align: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-        }
-        .nav a {
-            margin: 0 10px;
-            padding: 8px 16px;
-            background: #2563eb;
-            color: white;
-            border-radius: 6px;
-            text-decoration: none;
-            font-weight: bold;
-        }
-        .nav a:hover {
-            background: #1d4ed8;
-        }
-
-        /* 个人简介卡片 */
-        .profile-card {
-            background: white;
-            padding: 40px;
-            border-radius: 12px;
-            text-align: center;
-            box-shadow: 0 2px 15px rgba(0,0,0,0.08);
-        }
-        .profile-card h1 {
-            font-size: 28px;
-            margin-bottom: 15px;
-            color: #222;
-        }
-        .profile-card p {
-            font-size: 16px;
-            color: #555;
-            line-height: 1.7;
+            font-size: 26px;
             margin-bottom: 20px;
+            color: #333;
         }
-        .tags span {
-            display: inline-block;
-            background: #e0ebff;
-            color: #2563eb;
-            padding: 6px 14px;
-            border-radius: 20px;
-            margin: 5px;
+        .search-box {
+            max-width: 500px;
+            margin: 0 auto 40px;
+            display: flex;
+            gap: 8px;
+        }
+        #searchInput {
+            flex: 1;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 15px;
+            outline: none;
+        }
+        #searchInput:focus {
+            border-color: #1890ff;
+        }
+        .search-btn {
+            padding: 10px 16px;
+            background: #1890ff;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .search-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .tree {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+        .node {
+            padding: 12px 20px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            text-align: center;
+            min-width: 130px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+        }
+        .node.highlight {
+            background: #fff2cc;
+            border-color: #ff9800;
+            transform: scale(1.08);
+            box-shadow: 0 0 12px rgba(255, 152, 0, 0.3);
+        }
+        .children {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+            position: relative;
+        }
+        .child {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0 20px;
+            position: relative;
+        }
+        .child::before {
+            content: "";
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 1px;
+            height: 10px;
+            background: #999;
+        }
+        .children::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            height: 1px;
+            background: #999;
+            z-index: -1;
+        }
+        #loading {
+            text-align: center;
+            font-size: 18px;
+            color: #666;
+            margin: 50px 0;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- 顶部导航 -->
-        <div class="nav">
-            <a href="index.html">🏠 个人简介</a>
-            <a href="links.html">🔗 我的收藏</a>
-        </div>
-
-        <!-- 个人简介内容 -->
-        <div class="profile-card">
-            <h1>👋 你好，我是 XXX</h1>
-            <p>热爱编程、喜欢收集高效工具、持续学习的技术爱好者。</p>
-            <p>这个网站用来展示我的个人介绍和常用收藏网站。</p>
-
-            <div class="tags">
-                <span>编程学习者</span>
-                <span>前端爱好者</span>
-                <span>工具控</span>
-                <span>GitHub 用户</span>
-            </div>
-        </div>
+    <div class="title">谌氏族谱</div>
+    <div class="search-box">
+        <input type="text" id="searchInput" placeholder="输入名字搜索..." autocomplete="off">
+        <button class="search-btn" onclick="prevMatch()" disabled>上一个</button>
+        <button class="search-btn" onclick="nextMatch()" disabled>下一个</button>
     </div>
+    <div id="loading">正在读取族谱数据...</div>
+    <div id="tree"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script>
+        let matchNodes = [];
+        let currentIndex = 0;
+
+        // 读取Excel
+        async function loadExcel() {
+            try {
+                const res = await fetch("谌氏族谱.xlsx");
+                const blob = await res.blob();
+                const data = await blob.arrayBuffer();
+                const workbook = XLSX.read(data);
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const json = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                buildTree(json);
+                document.getElementById("loading").style.display = "none";
+            } catch (e) {
+                document.getElementById("loading").innerText = "读取Excel失败，请检查文件名";
+                console.error(e);
+            }
+        }
+
+        // 🔥 自动识别代数：Excel有几列就几代，无上限
+        function buildTree(rows) {
+            let root = { name: "谌氏始祖", generation: "总谱", children: [] };
+            let nodeMap = {}; // 防止重复节点
+
+            rows.forEach(row => {
+                if (!row || row.every(cell => cell === "")) return;
+                
+                let currentParent = root;
+                row.forEach((name, colIndex) => {
+                    if (!name) return;
+                    const genText = `第${colIndex + 1}代`;
+                    const key = currentParent.name + "_" + name;
+
+                    if (!nodeMap[key]) {
+                        const newNode = { name, generation: genText, children: [] };
+                        currentParent.children.push(newNode);
+                        nodeMap[key] = newNode;
+                    }
+                    currentParent = nodeMap[key];
+                });
+            });
+
+            document.getElementById("tree").innerHTML = renderNode(root);
+            searchName();
+        }
+
+        // 渲染节点（递归）
+        function renderNode(node) {
+            let html = `<div class="node" data-name="${node.name}">${node.name}<br><small>${node.generation}</small></div>`;
+            if (node.children && node.children.length > 0) {
+                html += `<div class="children">`;
+                node.children.forEach(child => {
+                    html += `<div class="child">${renderNode(child)}</div>`;
+                });
+                html += `</div>`;
+            }
+            return html;
+        }
+
+        // 搜索功能
+        const input = document.getElementById('searchInput');
+        input.addEventListener('input', searchName);
+        input.addEventListener('keyup', e => e.key === 'Enter' && nextMatch());
+
+        function searchName() {
+            const key = input.value.trim();
+            document.querySelectorAll('.node').forEach(n => n.classList.remove('highlight'));
+            matchNodes = [];
+            currentIndex = 0;
+            document.querySelectorAll('.search-btn').forEach(b => b.disabled = true);
+            if (!key) return;
+
+            document.querySelectorAll('.node').forEach(node => {
+                if (node.dataset.name.includes(key)) matchNodes.push(node);
+            });
+
+            if (matchNodes.length > 0) {
+                document.querySelectorAll('.search-btn').forEach(b => b.disabled = false);
+                goToMatch(0);
+            }
+        }
+
+        function goToMatch(index) {
+            document.querySelectorAll('.node').forEach(n => n.classList.remove('highlight'));
+            matchNodes[index].classList.add('highlight');
+            matchNodes[index].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function prevMatch() {
+            currentIndex = (currentIndex - 1 + matchNodes.length) % matchNodes.length;
+            goToMatch(currentIndex);
+        }
+
+        function nextMatch() {
+            currentIndex = (currentIndex + 1) % matchNodes.length;
+            goToMatch(currentIndex);
+        }
+
+        window.onload = loadExcel;
+    </script>
 </body>
 </html>
