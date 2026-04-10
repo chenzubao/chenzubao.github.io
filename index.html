@@ -51,12 +51,12 @@
             cursor: not-allowed;
         }
 
-        /* 🔥 竖版垂直族谱核心样式 */
+        /* 竖版垂直族谱样式 */
         .tree {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 10px;
+            gap: 0;
             margin-top: 20px;
         }
         .node {
@@ -69,6 +69,7 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             transition: all 0.3s;
             position: relative;
+            margin: 10px 0;
         }
         .node.highlight {
             background: #fff2cc;
@@ -77,7 +78,7 @@
             box-shadow: 0 0 12px rgba(255, 152, 0, 0.3);
         }
 
-        /* 竖线：连接上下代 */
+        /* 竖线连接上下代 */
         .node::after {
             content: "";
             width: 1px;
@@ -88,7 +89,6 @@
             left: 50%;
             transform: translateX(-50%);
         }
-        /* 最后一代不画线 */
         .node.last::after {
             display: none;
         }
@@ -133,28 +133,41 @@
             }
         }
 
-        // 🔥 竖版族谱：自动按Excel列 从上到下排列
+        // 🔥 核心：按Excel每一行，从上到下竖版展示（不改Excel）
         function buildVerticalTree(rows) {
-            let treeHtml = '';
+            const treeContainer = document.getElementById("tree");
+            treeContainer.innerHTML = "";
+
             if (!rows || rows.length === 0) {
-                document.getElementById("tree").innerHTML = "暂无数据";
+                treeContainer.innerHTML = "暂无数据";
                 return;
             }
 
-            // 取第一行，按列生成 垂直代数
-            const firstRow = rows[0];
-            firstRow.forEach((name, index) => {
-                if (!name) return;
-                const gen = `第${index + 1}代`;
-                const isLast = index === firstRow.length - 1;
-                treeHtml += `
-                    <div class="node ${isLast ? 'last' : ''}" data-name="${name}">
-                        ${name}<br><small>${gen}</small>
-                    </div>
-                `;
+            // 遍历每一行，生成垂直族谱
+            rows.forEach((row, rowIndex) => {
+                if (!row || row.every(item => !item)) return;
+
+                const rowWrapper = document.createElement("div");
+                rowWrapper.style.marginBottom = "40px";
+                treeContainer.appendChild(rowWrapper);
+
+                const tree = document.createElement("div");
+                tree.className = "tree";
+                rowWrapper.appendChild(tree);
+
+                // 每一行的每一列 = 一代，从上往下排列
+                row.forEach((name, colIndex) => {
+                    if (!name) return;
+
+                    const node = document.createElement("div");
+                    const isLast = colIndex === row.length - 1;
+                    node.className = `node ${isLast ? "last" : ""}`;
+                    node.dataset.name = name;
+                    node.innerHTML = `${name}<br><small>第${colIndex + 1}代</small>`;
+                    tree.appendChild(node);
+                });
             });
 
-            document.getElementById("tree").innerHTML = treeHtml;
             searchName();
         }
 
