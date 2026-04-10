@@ -51,48 +51,53 @@
             cursor: not-allowed;
         }
 
-        /* 一代一排 横向布局 */
-        .generation {
+        /* 族谱布局 */
+        .tree {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        .generation-row {
             display: flex;
             justify-content: center;
-            align-items: flex-start;
-            gap: 30px;
-            margin: 15px 0;
+            gap: 60px;
             position: relative;
         }
-
-        /* 人物卡片 */
-        .node {
-            padding: 12px 18px;
+        .person {
+            padding: 10px 14px;
             background: #fff;
             border: 1px solid #ddd;
-            border-radius: 8px;
+            border-radius: 6px;
             text-align: center;
-            min-width: 140px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            transition: all 0.3s;
+            min-width: 130px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             position: relative;
+            white-space: nowrap;
         }
-        .node.highlight {
+        .person.highlight {
             background: #fff2cc;
             border-color: #ff9800;
             transform: scale(1.08);
-            box-shadow: 0 0 12px rgba(255, 152, 0, 0.3);
         }
 
-        /* 垂直连线：代与代之间 */
-        .line-vertical {
+        /* 垂直连线：父 → 子 */
+        .line-v {
             width: 1px;
             height: 20px;
-            background: #999;
+            background: #666;
             margin: 0 auto;
         }
 
-        #loading {
-            text-align: center;
-            font-size: 18px;
-            color: #666;
-            margin: 50px 0;
+        /* 水平连线：多兄弟 */
+        .line-h {
+            height: 1px;
+            background: #666;
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: -1;
         }
     </style>
 </head>
@@ -120,7 +125,7 @@
                 const workbook = XLSX.read(data);
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                 const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-                buildFamilyTree(rows);
+                buildRealFamilyTree(rows);
                 document.getElementById("loading").style.display = "none";
             } catch (e) {
                 document.getElementById("loading").innerText = "读取Excel失败，请检查文件名";
@@ -128,52 +133,59 @@
             }
         }
 
-        // 🔥 核心：一代一排，垂直向下排列
-        function buildFamilyTree(rows) {
-            const treeContainer = document.getElementById("tree");
-            treeContainer.innerHTML = "";
+        // 🔥 真正的族谱：父→子关系严格对应Excel每行
+        function buildRealFamilyTree(rows) {
+            const container = document.getElementById("tree");
+            container.innerHTML = "";
 
-            if (!rows || rows.length === 0) {
-                treeContainer.innerHTML = "暂无数据";
-                return;
-            }
-
-            // 按列分组 = 按代分组
-            const maxGen = rows[0].length;
-            const generations = Array.from({ length: maxGen }, () => new Set());
+            // 按世代分组（严格父子关系）
+            const genMap = new Map();
+            const parentChildMap = new Map();
 
             rows.forEach(row => {
-                row.forEach((name, colIndex) => {
-                    if (name && name.toString().trim()) {
-                        generations[colIndex].add(name.toString().trim());
+                let validCells = row.filter(n => n && n.toString().trim());
+                if (validCells.length < 1) return;
+
+                for (let i = 0; i < validCells.length; i++) {
+                    const gen = i + 1;
+                    const name = validCells[i].toString().trim();
+                    if (!genMap.has(gen)) genMap.set(gen, []);
+                    if (!genMap.get(gen).includes(name)) genMap.get(gen).push(name);
+
+                    // 绑定父子关系
+                    if (i > 0) {
+                        const parent = validCells[i - 1].toString().trim();
+                        if (!parentChildMap.has(parent)) parentChildMap.set(parent, []);
+                        if (!parentChildMap.get(parent).includes(name)) {
+                            parentChildMap.get(parent).push(name);
+                        }
                     }
-                });
+                }
             });
 
-            // 渲染每一代（一排）
-            generations.forEach((genSet, index) => {
-                const genList = Array.from(genSet);
-                if (genList.length === 0) return;
+            // 渲染每一代 + 父子连线
+            const gens = Array.from(genMap.keys()).sort((a, b) => a - b);
+            gens.forEach((genNum, idx) => {
+                const people = genMap.get(genNum);
 
-                // 垂直连线
-                if (index > 0) {
-                    const line = document.createElement("div");
-                    line.className = "line-vertical";
-                    treeContainer.appendChild(line);
-                }
+                const row = document.createElement("div");
+                row.className = "generation-row";
+                container.appendChild(row);
 
-                // 一代一排
-                const genDiv = document.createElement("div");
-                genDiv.className = "generation";
-                treeContainer.appendChild(genDiv);
-
-                genList.forEach(name => {
+                people.forEach(name => {
                     const node = document.createElement("div");
-                    node.className = "node";
+                    node.className = "person";
                     node.dataset.name = name;
-                    node.innerHTML = `${name}<br><small>第${index + 1}代</small>`;
-                    genDiv.appendChild(node);
+                    node.innerText = `${name} (第${genNum}代)`;
+                    row.appendChild(node);
                 });
+
+                // 添加垂直连线
+                if (idx < gens.length - 1) {
+                    const line = document.createElement("div");
+                    line.className = "line-v";
+                    container.appendChild(line);
+                }
             });
 
             searchName();
@@ -186,13 +198,13 @@
 
         function searchName() {
             const key = input.value.trim();
-            document.querySelectorAll('.node').forEach(n => n.classList.remove('highlight'));
+            document.querySelectorAll('.person').forEach(n => n.classList.remove('highlight'));
             matchNodes = [];
             currentIndex = 0;
             document.querySelectorAll('.search-btn').forEach(b => b.disabled = true);
             if (!key) return;
 
-            document.querySelectorAll('.node').forEach(node => {
+            document.querySelectorAll('.person').forEach(node => {
                 if (node.dataset.name.includes(key)) matchNodes.push(node);
             });
 
@@ -203,7 +215,7 @@
         }
 
         function goToMatch(index) {
-            document.querySelectorAll('.node').forEach(n => n.classList.remove('highlight'));
+            document.querySelectorAll('.person').forEach(n => n.classList.remove('highlight'));
             matchNodes[index].classList.add('highlight');
             matchNodes[index].scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
