@@ -23,7 +23,7 @@
         }
         .search-box {
             max-width: 600px;
-            margin: 0 auto 40px;
+            margin: 0 auto 30px;
             display: flex;
             gap: 8px;
         }
@@ -51,18 +51,17 @@
             cursor: not-allowed;
         }
 
-        /* 正常族谱排版：一代一排，垂直向下 */
+        /* 组织结构图核心样式 */
         .tree {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 0;
         }
         .generation {
             display: flex;
             justify-content: center;
-            gap: 50px;
-            margin: 15px 0;
+            gap: 40px;
+            margin: 10px 0;
             position: relative;
         }
         .person {
@@ -80,12 +79,16 @@
             transform: scale(1.08);
         }
 
-        /* 父子连线 */
+        /* 代与代之间的垂直连线 */
         .line-v {
             width: 1px;
             height: 25px;
             background: #666;
             margin: 0 auto;
+        }
+        #loading {
+            text-align: center;
+            padding: 20px;
         }
     </style>
 </head>
@@ -99,7 +102,7 @@
     <div id="loading">正在读取族谱数据...</div>
     <div id="tree"></div>
 
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min"></script>
     <script>
         let matchNodes = [];
         let currentIndex = 0;
@@ -111,60 +114,52 @@
                 const blob = await res.blob();
                 const data = await blob.arrayBuffer();
                 const workbook = XLSX.read(data);
-                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
                 buildTree(rows);
                 document.getElementById("loading").style.display = "none";
             } catch (e) {
-                document.getElementById("loading").innerText = "读取Excel失败，请检查文件名";
+                document.getElementById("loading").innerText = "读取Excel失败";
                 console.error(e);
             }
         }
 
-        // 🔥 稳定不错乱：严格按Excel父子关系 + 一代一排
+        // 🔥 核心：按Excel列=代，每代横排，垂直向下（标准组织结构图）
         function buildTree(rows) {
             const container = document.getElementById("tree");
             container.innerHTML = "";
 
-            // 按世代整理（自动去重）
-            const genMap = new Map();
-            const parentChild = new Map();
+            // 按【列=代】分组（你Excel的结构）
+            const generations = new Map();
 
             rows.forEach(row => {
-                const valid = row.filter(n => n && n.toString().trim());
-                for (let i = 0; i < valid.length; i++) {
-                    const name = valid[i].toString().trim();
-                    const gen = i + 1;
-                    if (!genMap.has(gen)) genMap.set(gen, new Set());
-                    genMap.get(gen).add(name);
-
-                    // 绑定父子
-                    if (i > 0) {
-                        const p = valid[i - 1].toString().trim();
-                        if (!parentChild.has(p)) parentChild.set(p, new Set());
-                        parentChild.get(p).add(name);
-                    }
-                }
+                row.forEach((cell, colIndex) => {
+                    if (!cell) return;
+                    const name = cell.toString().trim();
+                    const gen = colIndex + 1;
+                    if (!generations.has(gen)) generations.set(gen, new Set());
+                    generations.get(gen).add(name);
+                });
             });
 
-            // 渲染：一代一排 + 垂直连线
-            const gens = Array.from(genMap.keys()).sort((a, b) => a - b);
-            gens.forEach((g, idx) => {
-                // 一代一排
-                const genDiv = document.createElement("div");
-                genDiv.className = "generation";
-                container.appendChild(genDiv);
+            // 渲染：每一代横排，代代垂直向下
+            const genList = Array.from(generations.keys()).sort((a, b) => a - b);
+            genList.forEach((genNum, idx) => {
+                // 一代一横排
+                const genBox = document.createElement("div");
+                genBox.className = "generation";
+                container.appendChild(genBox);
 
-                Array.from(genMap.get(g)).forEach(name => {
+                Array.from(generations.get(genNum)).forEach(name => {
                     const node = document.createElement("div");
                     node.className = "person";
                     node.dataset.name = name;
-                    node.textContent = `${name}（第${g}代）`;
-                    genDiv.appendChild(node);
+                    node.textContent = `${name}（第${genNum}代）`;
+                    genBox.appendChild(node);
                 });
 
-                // 加垂直连线（除了最后一代）
-                if (idx < gens.length - 1) {
+                // 加垂直连线（非最后一代）
+                if (idx < genList.length - 1) {
                     const line = document.createElement("div");
                     line.className = "line-v";
                     container.appendChild(line);
