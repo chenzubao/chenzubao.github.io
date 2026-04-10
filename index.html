@@ -50,11 +50,14 @@
             background: #ccc;
             cursor: not-allowed;
         }
+
+        /* 🔥 竖版垂直族谱核心样式 */
         .tree {
             display: flex;
             flex-direction: column;
             align-items: center;
-            position: relative;
+            gap: 10px;
+            margin-top: 20px;
         }
         .node {
             padding: 12px 20px;
@@ -62,9 +65,10 @@
             border: 1px solid #ddd;
             border-radius: 8px;
             text-align: center;
-            min-width: 130px;
+            min-width: 160px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             transition: all 0.3s;
+            position: relative;
         }
         .node.highlight {
             background: #fff2cc;
@@ -72,40 +76,23 @@
             transform: scale(1.08);
             box-shadow: 0 0 12px rgba(255, 152, 0, 0.3);
         }
-        .children {
-            display: flex;
-            justify-content: center;
-            margin-top: 20px;
-            position: relative;
-        }
-        .child {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin: 0 20px;
-            position: relative;
-        }
-        .child::before {
+
+        /* 竖线：连接上下代 */
+        .node::after {
             content: "";
-            position: absolute;
-            top: -10px;
-            left: 50%;
-            transform: translateX(-50%);
             width: 1px;
-            height: 10px;
+            height: 20px;
             background: #999;
-        }
-        .children::before {
-            content: "";
             position: absolute;
-            top: 0;
+            bottom: -20px;
             left: 50%;
             transform: translateX(-50%);
-            width: 90%;
-            height: 1px;
-            background: #999;
-            z-index: -1;
         }
+        /* 最后一代不画线 */
+        .node.last::after {
+            display: none;
+        }
+
         #loading {
             text-align: center;
             font-size: 18px;
@@ -138,7 +125,7 @@
                 const workbook = XLSX.read(data);
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                 const json = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-                buildTree(json);
+                buildVerticalTree(json);
                 document.getElementById("loading").style.display = "none";
             } catch (e) {
                 document.getElementById("loading").innerText = "读取Excel失败，请检查文件名";
@@ -146,44 +133,29 @@
             }
         }
 
-        // 🔥 自动识别代数：Excel有几列就几代，无上限
-        function buildTree(rows) {
-            let root = { name: "谌氏始祖", generation: "总谱", children: [] };
-            let nodeMap = {}; // 防止重复节点
+        // 🔥 竖版族谱：自动按Excel列 从上到下排列
+        function buildVerticalTree(rows) {
+            let treeHtml = '';
+            if (!rows || rows.length === 0) {
+                document.getElementById("tree").innerHTML = "暂无数据";
+                return;
+            }
 
-            rows.forEach(row => {
-                if (!row || row.every(cell => cell === "")) return;
-                
-                let currentParent = root;
-                row.forEach((name, colIndex) => {
-                    if (!name) return;
-                    const genText = `第${colIndex + 1}代`;
-                    const key = currentParent.name + "_" + name;
-
-                    if (!nodeMap[key]) {
-                        const newNode = { name, generation: genText, children: [] };
-                        currentParent.children.push(newNode);
-                        nodeMap[key] = newNode;
-                    }
-                    currentParent = nodeMap[key];
-                });
+            // 取第一行，按列生成 垂直代数
+            const firstRow = rows[0];
+            firstRow.forEach((name, index) => {
+                if (!name) return;
+                const gen = `第${index + 1}代`;
+                const isLast = index === firstRow.length - 1;
+                treeHtml += `
+                    <div class="node ${isLast ? 'last' : ''}" data-name="${name}">
+                        ${name}<br><small>${gen}</small>
+                    </div>
+                `;
             });
 
-            document.getElementById("tree").innerHTML = renderNode(root);
+            document.getElementById("tree").innerHTML = treeHtml;
             searchName();
-        }
-
-        // 渲染节点（递归）
-        function renderNode(node) {
-            let html = `<div class="node" data-name="${node.name}">${node.name}<br><small>${node.generation}</small></div>`;
-            if (node.children && node.children.length > 0) {
-                html += `<div class="children">`;
-                node.children.forEach(child => {
-                    html += `<div class="child">${renderNode(child)}</div>`;
-                });
-                html += `</div>`;
-            }
-            return html;
         }
 
         // 搜索功能
