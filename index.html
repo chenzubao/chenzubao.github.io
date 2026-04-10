@@ -23,7 +23,7 @@
         }
         .search-box {
             max-width: 600px;
-            margin: 0 auto 30px;
+            margin: 0 auto 40px;
             display: flex;
             gap: 8px;
         }
@@ -51,44 +51,48 @@
             cursor: not-allowed;
         }
 
-        /* 组织结构图核心样式 */
-        .tree {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
+        /* 一代一排 横向布局 */
         .generation {
             display: flex;
             justify-content: center;
-            gap: 40px;
-            margin: 10px 0;
+            align-items: flex-start;
+            gap: 30px;
+            margin: 15px 0;
             position: relative;
         }
-        .person {
-            padding: 10px 14px;
+
+        /* 人物卡片 */
+        .node {
+            padding: 12px 18px;
             background: #fff;
             border: 1px solid #ddd;
-            border-radius: 6px;
+            border-radius: 8px;
             text-align: center;
             min-width: 140px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: all 0.3s;
+            position: relative;
         }
-        .person.highlight {
+        .node.highlight {
             background: #fff2cc;
             border-color: #ff9800;
             transform: scale(1.08);
+            box-shadow: 0 0 12px rgba(255, 152, 0, 0.3);
         }
 
-        /* 代与代之间的垂直连线 */
-        .line-v {
+        /* 垂直连线：代与代之间 */
+        .line-vertical {
             width: 1px;
-            height: 25px;
-            background: #666;
+            height: 20px;
+            background: #999;
             margin: 0 auto;
         }
+
         #loading {
             text-align: center;
-            padding: 20px;
+            font-size: 18px;
+            color: #666;
+            margin: 50px 0;
         }
     </style>
 </head>
@@ -102,7 +106,7 @@
     <div id="loading">正在读取族谱数据...</div>
     <div id="tree"></div>
 
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script>
         let matchNodes = [];
         let currentIndex = 0;
@@ -110,60 +114,66 @@
         // 读取Excel
         async function loadExcel() {
             try {
-                const res = await fetch("谌氏族谱.csv");
+                const res = await fetch("谌氏族谱.xlsx");
                 const blob = await res.blob();
                 const data = await blob.arrayBuffer();
                 const workbook = XLSX.read(data);
-                const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-                buildTree(rows);
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                buildFamilyTree(rows);
                 document.getElementById("loading").style.display = "none";
             } catch (e) {
-                document.getElementById("loading").innerText = "读取Excel失败";
+                document.getElementById("loading").innerText = "读取Excel失败，请检查文件名";
                 console.error(e);
             }
         }
 
-        // 🔥 核心：按Excel列=代，每代横排，垂直向下（标准组织结构图）
-        function buildTree(rows) {
-            const container = document.getElementById("tree");
-            container.innerHTML = "";
+        // 🔥 核心：一代一排，垂直向下排列
+        function buildFamilyTree(rows) {
+            const treeContainer = document.getElementById("tree");
+            treeContainer.innerHTML = "";
 
-            // 按【列=代】分组（你Excel的结构）
-            const generations = new Map();
+            if (!rows || rows.length === 0) {
+                treeContainer.innerHTML = "暂无数据";
+                return;
+            }
+
+            // 按列分组 = 按代分组
+            const maxGen = rows[0].length;
+            const generations = Array.from({ length: maxGen }, () => new Set());
 
             rows.forEach(row => {
-                row.forEach((cell, colIndex) => {
-                    if (!cell) return;
-                    const name = cell.toString().trim();
-                    const gen = colIndex + 1;
-                    if (!generations.has(gen)) generations.set(gen, new Set());
-                    generations.get(gen).add(name);
+                row.forEach((name, colIndex) => {
+                    if (name && name.toString().trim()) {
+                        generations[colIndex].add(name.toString().trim());
+                    }
                 });
             });
 
-            // 渲染：每一代横排，代代垂直向下
-            const genList = Array.from(generations.keys()).sort((a, b) => a - b);
-            genList.forEach((genNum, idx) => {
-                // 一代一横排
-                const genBox = document.createElement("div");
-                genBox.className = "generation";
-                container.appendChild(genBox);
+            // 渲染每一代（一排）
+            generations.forEach((genSet, index) => {
+                const genList = Array.from(genSet);
+                if (genList.length === 0) return;
 
-                Array.from(generations.get(genNum)).forEach(name => {
-                    const node = document.createElement("div");
-                    node.className = "person";
-                    node.dataset.name = name;
-                    node.textContent = `${name}（第${genNum}代）`;
-                    genBox.appendChild(node);
-                });
-
-                // 加垂直连线（非最后一代）
-                if (idx < genList.length - 1) {
+                // 垂直连线
+                if (index > 0) {
                     const line = document.createElement("div");
-                    line.className = "line-v";
-                    container.appendChild(line);
+                    line.className = "line-vertical";
+                    treeContainer.appendChild(line);
                 }
+
+                // 一代一排
+                const genDiv = document.createElement("div");
+                genDiv.className = "generation";
+                treeContainer.appendChild(genDiv);
+
+                genList.forEach(name => {
+                    const node = document.createElement("div");
+                    node.className = "node";
+                    node.dataset.name = name;
+                    node.innerHTML = `${name}<br><small>第${index + 1}代</small>`;
+                    genDiv.appendChild(node);
+                });
             });
 
             searchName();
@@ -176,13 +186,13 @@
 
         function searchName() {
             const key = input.value.trim();
-            document.querySelectorAll('.person').forEach(n => n.classList.remove('highlight'));
+            document.querySelectorAll('.node').forEach(n => n.classList.remove('highlight'));
             matchNodes = [];
             currentIndex = 0;
             document.querySelectorAll('.search-btn').forEach(b => b.disabled = true);
             if (!key) return;
 
-            document.querySelectorAll('.person').forEach(node => {
+            document.querySelectorAll('.node').forEach(node => {
                 if (node.dataset.name.includes(key)) matchNodes.push(node);
             });
 
@@ -193,14 +203,16 @@
         }
 
         function goToMatch(index) {
-            document.querySelectorAll('.person').forEach(n => n.classList.remove('highlight'));
+            document.querySelectorAll('.node').forEach(n => n.classList.remove('highlight'));
             matchNodes[index].classList.add('highlight');
             matchNodes[index].scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
+
         function prevMatch() {
             currentIndex = (currentIndex - 1 + matchNodes.length) % matchNodes.length;
             goToMatch(currentIndex);
         }
+
         function nextMatch() {
             currentIndex = (currentIndex + 1) % matchNodes.length;
             goToMatch(currentIndex);
